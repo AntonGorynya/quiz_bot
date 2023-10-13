@@ -2,7 +2,7 @@ from pathlib import Path
 import re
 import random
 from environs import Env
-
+from functools import partial
 
 from telegram import Update, ForceReply, KeyboardButton, ReplyKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
@@ -25,13 +25,7 @@ def start(update: Update, context: CallbackContext) -> None:
     )
 
 
-def send_question(update, context) -> None:
-    for file_name in Path(QUIZ_FOLDER).iterdir():
-        path = Path.cwd() / file_name
-        text = path.read_text(encoding='KOI8-R')
-        questions = extract_questions(text)
-        break
-
+def send_question(update, context, questions) -> None:
     question, answer= random.choice(list(questions.items()))
     update.message.reply_text(f'{question} \n {answer}')
 
@@ -52,13 +46,24 @@ def extract_questions(text) -> dict:
     return dict(zip(questions, answers))
 
 
+def get_questions(quiz_folder) -> dict:
+    questions = {}
+    for file_name in Path(quiz_folder).iterdir():
+        path = Path.cwd() / file_name
+        text = path.read_text(encoding='KOI8-R')
+        questions.update(extract_questions(text))
+        break
+    return questions
+
+
 def main(bot_token) -> None:
     """Start the bot."""
+    callback_send_question = partial(send_question, questions=get_questions(QUIZ_FOLDER))
     updater = Updater(bot_token)
     dispatcher = updater.dispatcher
     dispatcher.add_handler(CommandHandler("start", start))
     dispatcher.add_handler(CommandHandler("help", help_command))
-    dispatcher.add_handler(MessageHandler(Filters.regex('Новый вопрос.*'), send_question))
+    dispatcher.add_handler(MessageHandler(Filters.regex('Новый вопрос.*'), callback_send_question))
     dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, echo))
     updater.start_polling()
     updater.idle()
