@@ -11,6 +11,7 @@ Python3 должен быть уже установлен.
 ```
 pip install -r requirements.txt
 ```
+Скачайте [архив с вопросами](https://dvmn.org/media/modules_dist/quiz-questions.zip) и распакуйте в папку со скриптом
 
 ### Пример запуска
 
