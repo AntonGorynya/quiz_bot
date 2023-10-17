@@ -1,20 +1,21 @@
-from pathlib import Path
-import sqlite3
-import os
-import re
-import random
+from enum import Enum
 from environs import Env
 from functools import partial
+from pathlib import Path
+import random
+import sqlite3
 
-from telegram import Update, ForceReply, KeyboardButton, ReplyKeyboardMarkup
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
+from telegram import Update, ForceReply, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext, ConversationHandler
+from common import get_questions, check_answer
 
 QUIZ_FOLDER = 'quiz-questions'
+STAGE = Enum('Stage', ['QUIZ'])
 
-
-def start(update: Update, context: CallbackContext) -> None:
+def start(update: Update, context: CallbackContext):
     """Send a message when the command /start is issued."""
     user = update.effective_user
+    context.user_data['score'] = 0
     keyboard = [
         [KeyboardButton('Новый вопрос'), KeyboardButton('Сдаться')],
         [KeyboardButton('Мой счет')]
@@ -25,9 +26,15 @@ def start(update: Update, context: CallbackContext) -> None:
         fr'Hi {user.mention_markdown_v2()}\!',
         reply_markup=reply_markup,
     )
+    return STAGE['QUIZ'].value
 
 
-def send_question(update, context, questions, db_connection) -> None:
+def cancel(update, context):
+    update.message.reply_text('Bye!', reply_markup=ReplyKeyboardRemove())
+    return ConversationHandler.END
+
+
+def send_question(update, context, questions, db_connection):
     cursor = db_connection.cursor()
     chat_id = update.message.chat.id
     question, answer= random.choice(list(questions.items()))
@@ -35,11 +42,13 @@ def send_question(update, context, questions, db_connection) -> None:
     context.user_data['answer'] = answer
     cursor.execute('INSERT INTO User_answers (user_id, question, answered) VALUES (?, ?, ?)', (chat_id, question, 0))
     db_connection.commit()
+    return STAGE['QUIZ'].value
 
 
 def surrunder(update, context):
     answer = context.user_data['answer']
     update.message.reply_text(f'Верный ответ: {answer}')
+    return STAGE['QUIZ'].value
 
 
 def echo(update: Update, context: CallbackContext) -> None:
@@ -47,7 +56,7 @@ def echo(update: Update, context: CallbackContext) -> None:
     update.message.reply_text(update.message.text)
 
 
-def check_answer(update, context):
+def handle_solution_attempt(update, context):
     correct_answer = context.user_data['answer']
     user_answer = update.message.text
 
@@ -57,8 +66,9 @@ def check_answer(update, context):
     ]
     reply_markup = ReplyKeyboardMarkup(keyboard)
 
-    if user_answer == correct_answer:
+    if check_answer(user_answer, correct_answer):
         text = 'Правильно\! Поздравляю\! Для следующего вопроса нажми *«Новый вопрос»*'
+        context.user_data['score'] = context.user_data['score'] + 1
     else:
         text = 'Неправильно… Попробуешь ещё раз?'
 
@@ -66,23 +76,20 @@ def check_answer(update, context):
         text,
         reply_markup=reply_markup,
     )
+    return STAGE['QUIZ'].value
 
 
-
-def extract_questions(text) -> dict:
-    questions = re.findall(r'Вопрос \d+:\s(.*?)Ответ', text, re.DOTALL)
-    answers = re.findall(r'Ответ:\s(.+)\.\s\s', text)
-    return dict(zip(questions, answers))
-
-
-def get_questions(quiz_folder) -> dict:
-    questions = {}
-    for file_name in Path(quiz_folder).iterdir():
-        path = Path.cwd() / file_name
-        text = path.read_text(encoding='KOI8-R')
-        questions.update(extract_questions(text))
-        break
-    return questions
+def get_score(update, context):
+    score = context.user_data['score']
+    keyboard = [
+        [KeyboardButton('Новый вопрос'), KeyboardButton('Сдаться')],
+        [KeyboardButton('Мой счет')]
+    ]
+    reply_markup = ReplyKeyboardMarkup(keyboard)
+    update.message.reply_markdown_v2(
+        f'Ваш счет: {score}',
+        reply_markup=reply_markup,
+    )
 
 
 def main(bot_token, db_name) -> None:
@@ -99,14 +106,22 @@ def main(bot_token, db_name) -> None:
     ''')
     connection.commit()
 
-    callback_send_question = partial(send_question, questions=get_questions(QUIZ_FOLDER), db_connection=connection)
+    handle_new_question_request = partial(send_question, questions=get_questions(QUIZ_FOLDER), db_connection=connection)
     updater = Updater(bot_token)
     dispatcher = updater.dispatcher
-    dispatcher.add_handler(CommandHandler("start", start))
-    dispatcher.add_handler(MessageHandler(Filters.regex('Новый вопрос.*'), callback_send_question))
-    dispatcher.add_handler(MessageHandler(Filters.regex('[Сc]даться'), surrunder))
-    dispatcher.add_handler(MessageHandler(Filters.text, check_answer))
-    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, echo))
+    conv_handler = ConversationHandler(
+        entry_points=[CommandHandler('start', start)],
+        states={
+            STAGE['QUIZ'].value: [
+                MessageHandler(Filters.regex('Новый вопрос.*'), handle_new_question_request),
+                MessageHandler(Filters.regex('[Сc]даться'), surrunder),
+                MessageHandler(Filters.regex('Мой счет'), get_score),
+                MessageHandler(Filters.text, handle_solution_attempt),
+            ],
+        },
+        fallbacks=[CommandHandler('cancel', cancel)]
+    )
+    dispatcher.add_handler(conv_handler)
     updater.start_polling()
     updater.idle()
 
