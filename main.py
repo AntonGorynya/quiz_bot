@@ -2,6 +2,7 @@ from enum import Enum
 from environs import Env
 from functools import partial
 from pathlib import Path
+import argparse
 import random
 import sqlite3
 
@@ -9,7 +10,6 @@ from telegram import Update, ForceReply, KeyboardButton, ReplyKeyboardMarkup, Re
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext, ConversationHandler
 from common import get_questions, check_answer
 
-QUIZ_FOLDER = 'quiz-questions'
 STAGE = Enum('Stage', ['QUIZ'])
 
 def start(update: Update, context: CallbackContext):
@@ -92,7 +92,7 @@ def get_score(update, context):
     )
 
 
-def main(bot_token, db_name) -> None:
+def main(bot_token, db_name, quiz_folder) -> None:
     """Start the bot."""
     connection = sqlite3.connect(db_name, check_same_thread=False)
     cursor = connection.cursor()
@@ -106,7 +106,7 @@ def main(bot_token, db_name) -> None:
     ''')
     connection.commit()
 
-    handle_new_question_request = partial(send_question, questions=get_questions(QUIZ_FOLDER), db_connection=connection)
+    handle_new_question_request = partial(send_question, questions=get_questions(quiz_folder), db_connection=connection)
     updater = Updater(bot_token)
     dispatcher = updater.dispatcher
     conv_handler = ConversationHandler(
@@ -126,9 +126,20 @@ def main(bot_token, db_name) -> None:
     updater.idle()
 
 
+def create_parser():
+    parser = argparse.ArgumentParser(description='Run telegram bot')
+    parser.add_argument('--database', '-d', help='path to database', default='my_database.db')
+    parser.add_argument('--quizfolder', '-q', help='path to quiz folder', default='quiz-questions')
+    return parser
+
+
 if __name__ == '__main__':
     env = Env()
     env.read_env()
+    parser = create_parser()
+    args = parser.parse_args()
     bot_token = env('TG_TOKEN')
-    db_name = 'my_database.db'
-    main(bot_token, db_name)
+    db_name = args.database
+    quiz_folder = args.quizfolder
+
+    main(bot_token, db_name, quiz_folder)
