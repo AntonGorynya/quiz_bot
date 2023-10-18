@@ -6,7 +6,7 @@ import sqlite3
 
 def extract_questions(text) -> dict:
     questions = re.findall(r'Вопрос \d+:\s(.*?)Ответ', text, re.DOTALL)
-    answers = re.findall(r'Ответ:\s(.*?)\.\s\s', text)
+    answers = re.findall(r'Ответ:\s(.*?)\s\s', text)
     return dict(zip(questions, answers))
 
 
