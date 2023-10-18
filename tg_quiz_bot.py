@@ -2,15 +2,15 @@ from enum import Enum
 from environs import Env
 from functools import partial
 from pathlib import Path
-import argparse
 import random
 import sqlite3
 
-from telegram import Update, ForceReply, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
+from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext, ConversationHandler
-from common import get_questions, check_answer
+from common import get_questions, check_answer, create_parser, create_or_connect_db
 
 STAGE = Enum('Stage', ['QUIZ'])
+
 
 def start(update: Update, context: CallbackContext):
     """Send a message when the command /start is issued."""
@@ -37,8 +37,8 @@ def cancel(update, context):
 def send_question(update, context, questions, db_connection):
     cursor = db_connection.cursor()
     chat_id = update.message.chat.id
-    question, answer= random.choice(list(questions.items()))
-    update.message.reply_text(f'{question} \n {answer}')
+    question, answer = random.choice(list(questions.items()))
+    update.message.reply_text(f'{question}')
     context.user_data['answer'] = answer
     cursor.execute('INSERT INTO User_answers (user_id, question, answered) VALUES (?, ?, ?)', (chat_id, question, 0))
     db_connection.commit()
@@ -49,11 +49,6 @@ def surrunder(update, context):
     answer = context.user_data['answer']
     update.message.reply_text(f'Верный ответ: {answer}')
     return STAGE['QUIZ'].value
-
-
-def echo(update: Update, context: CallbackContext) -> None:
-    """Echo the user message."""
-    update.message.reply_text(update.message.text)
 
 
 def handle_solution_attempt(update, context):
@@ -94,18 +89,7 @@ def get_score(update, context):
 
 def main(bot_token, db_name, quiz_folder) -> None:
     """Start the bot."""
-    connection = sqlite3.connect(db_name, check_same_thread=False)
-    cursor = connection.cursor()
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS User_answers (
-    id INTEGER PRIMARY KEY,
-    user_id INTEGER,
-    question TEXT NOT NULL,
-    answered INTEGER
-    )
-    ''')
-    connection.commit()
-
+    connection = create_or_connect_db(db_name)
     handle_new_question_request = partial(send_question, questions=get_questions(quiz_folder), db_connection=connection)
     updater = Updater(bot_token)
     dispatcher = updater.dispatcher
@@ -124,13 +108,6 @@ def main(bot_token, db_name, quiz_folder) -> None:
     dispatcher.add_handler(conv_handler)
     updater.start_polling()
     updater.idle()
-
-
-def create_parser():
-    parser = argparse.ArgumentParser(description='Run telegram bot')
-    parser.add_argument('--database', '-d', help='path to database', default='my_database.db')
-    parser.add_argument('--quizfolder', '-q', help='path to quiz folder', default='quiz-questions')
-    return parser
 
 
 if __name__ == '__main__':
