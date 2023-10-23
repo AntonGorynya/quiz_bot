@@ -1,9 +1,7 @@
 from enum import Enum
 from environs import Env
 from functools import partial
-from pathlib import Path
 import random
-import sqlite3
 
 from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext, ConversationHandler
@@ -31,7 +29,7 @@ def start(update: Update, context: CallbackContext):
     return STAGE['QUIZ'].value
 
 
-def cancel(update, context):
+def cancel(update, _):
     update.message.reply_text('Bye!', reply_markup=ReplyKeyboardRemove())
     return ConversationHandler.END
 

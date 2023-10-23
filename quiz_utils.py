@@ -14,7 +14,6 @@ def get_questions(quiz_folder) -> dict:
         path = Path.cwd() / file_name
         text = path.read_text(encoding='KOI8-R')
         questions.update(extract_questions(text))
-        break
     return questions
 
 
