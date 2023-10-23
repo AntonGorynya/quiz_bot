@@ -1,7 +1,5 @@
 from pathlib import Path
-import argparse
 import re
-import sqlite3
 
 
 def extract_questions(text) -> dict:
@@ -31,25 +29,3 @@ def check_answer(user_answer, correct_answer):
     if user_answer == correct_answer:
         return True
     return False
-
-
-def create_parser():
-    parser = argparse.ArgumentParser(description='Run bot')
-    parser.add_argument('--database', '-d', help='path to database', default='my_database.db')
-    parser.add_argument('--quizfolder', '-q', help='path to quiz folder', default='quiz-questions')
-    return parser
-
-
-def create_or_connect_db(db_name):
-    connection = sqlite3.connect(db_name, check_same_thread=False)
-    cursor = connection.cursor()
-    cursor.execute('''
-       CREATE TABLE IF NOT EXISTS User_answers (
-       id INTEGER PRIMARY KEY,
-       user_id INTEGER,
-       question TEXT NOT NULL,
-       answered INTEGER
-       )
-       ''')
-    connection.commit()
-    return connection

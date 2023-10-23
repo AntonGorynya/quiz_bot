@@ -7,7 +7,9 @@ import sqlite3
 
 from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext, ConversationHandler
-from common import get_questions, check_answer, create_parser, create_or_connect_db
+from quiz_utils import get_questions, check_answer
+from db_functions import create_or_connect_db
+from parser import create_parser
 
 STAGE = Enum('Stage', ['QUIZ'])
 

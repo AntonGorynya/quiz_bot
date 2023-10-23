@@ -3,7 +3,9 @@ import vk_api as vk
 from vk_api.longpoll import VkLongPoll, VkEventType
 from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 from environs import Env
-from common import get_questions, create_parser, create_or_connect_db, check_answer
+from quiz_utils import get_questions, check_answer
+from db_functions import create_or_connect_db
+from parser import create_parser
 
 
 def send_question(event, vk_api, questions, db_connection):
