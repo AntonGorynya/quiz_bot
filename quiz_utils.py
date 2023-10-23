@@ -25,6 +25,4 @@ def check_answer(user_answer, correct_answer):
         correct_answer = correct_answer.replace('"', '')
     if '... ' in correct_answer:
         correct_answer = correct_answer.replace('... ', '')
-    if user_answer == correct_answer:
-        return True
-    return False
+    return user_answer == correct_answer
