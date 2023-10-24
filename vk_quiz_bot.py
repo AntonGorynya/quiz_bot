@@ -5,7 +5,7 @@ from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 from environs import Env
 from quiz_utils import get_questions, check_answer
 from db_functions import create_or_connect_db
-from parser import create_parser
+from cli_interface import create_parser
 
 
 def send_question(event, vk_api, questions, db_connection):

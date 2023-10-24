@@ -7,7 +7,7 @@ from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardR
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext, ConversationHandler
 from quiz_utils import get_questions, check_answer
 from db_functions import create_or_connect_db
-from parser import create_parser
+from cli_interface import create_parser
 
 STAGE = Enum('Stage', ['QUIZ'])
 
