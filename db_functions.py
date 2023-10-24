@@ -1,4 +1,4 @@
-import sqlite3
+
 
 def create_users_answers_table(connection):
     cursor = connection.cursor()
@@ -23,6 +23,7 @@ def create_question_table(connection):
                )
                ''')
     connection.commit()
+
 
 def fill_question_table(connection, questions):
     cursor = connection.cursor()
@@ -49,7 +50,7 @@ def get_score(connection, user_id):
     return cursor.fetchone()[0]
 
 
-def get_question(connection, question_id=False):
+def get_question(connection, question_id=0):
     cursor = connection.cursor()
     if question_id:
         question_id, question, answer = cursor.execute(
@@ -63,6 +64,7 @@ def get_question(connection, question_id=False):
 
     return question_id, question, answer
 
+
 def insert_into_user_answers(connection, user_id, question_id, answered):
     cursor = connection.cursor()
     cursor.execute(
@@ -75,7 +77,7 @@ def insert_into_user_answers(connection, user_id, question_id, answered):
 def get_last_attempt(connection, user_id):
     cursor = connection.cursor()
     _, user_id, question_id, answered = cursor.execute(
-        'SELECT * FROM User_answers ORDER BY 1 DESC LIMIT 1'
+        'SELECT * FROM User_answers WHERE user_id = ? ORDER BY 1 DESC LIMIT 1',
+        (user_id,)
     ).fetchone()
     return user_id, question_id, answered
-

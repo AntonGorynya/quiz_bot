@@ -1,4 +1,5 @@
 import random
+import sqlite3
 import vk_api as vk
 from vk_api.longpoll import VkLongPoll, VkEventType
 from vk_api.keyboard import VkKeyboard, VkKeyboardColor
