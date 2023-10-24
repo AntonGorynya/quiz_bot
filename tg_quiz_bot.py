@@ -1,12 +1,12 @@
 from enum import Enum
 from environs import Env
 from functools import partial
-import random
+import sqlite3
 
 from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext, ConversationHandler
 from quiz_utils import get_questions, check_answer
-from db_functions import create_or_connect_db
+from db_functions import *
 from cli_interface import create_parser
 
 STAGE = Enum('Stage', ['QUIZ'])
@@ -34,26 +34,32 @@ def cancel(update, _):
     return ConversationHandler.END
 
 
-def send_question(update, context, questions, db_connection):
-    cursor = db_connection.cursor()
+def send_question(update, context, db_connection):
     chat_id = update.message.chat.id
-    question, answer = random.choice(list(questions.items()))
-    update.message.reply_text(f'{question}')
+    question_id, question, answer = get_question(db_connection)
+    insert_into_user_answers(db_connection, chat_id, question_id, 0)
+    update.message.reply_text(f'{question} \n {answer}')
     context.user_data['answer'] = answer
-    cursor.execute('INSERT INTO User_answers (user_id, question, answered) VALUES (?, ?, ?)', (chat_id, question, 0))
-    db_connection.commit()
+    context.user_data['question_id'] = question_id
+    context.user_data['connection'] = db_connection
     return STAGE['QUIZ'].value
 
 
 def surrunder(update, context):
-    answer = context.user_data['answer']
-    update.message.reply_text(f'Верный ответ: {answer}')
+    text = 'Cначала ответьте на новый вопрос'
+    if 'answer' in context.user_data:
+        answer = context.user_data['answer']
+        text = f'Верный ответ: {answer}'
+    update.message.reply_text(text)
     return STAGE['QUIZ'].value
 
 
 def handle_solution_attempt(update, context):
     correct_answer = context.user_data['answer']
+    question_id = context.user_data['question_id']
     user_answer = update.message.text
+    chat_id = update.message.chat.id
+    connection = context.user_data['connection']
 
     keyboard = [
         [KeyboardButton('Новый вопрос'), KeyboardButton('Сдаться')],
@@ -63,7 +69,8 @@ def handle_solution_attempt(update, context):
 
     if check_answer(user_answer, correct_answer):
         text = 'Правильно\! Поздравляю\! Для следующего вопроса нажми *«Новый вопрос»*'
-        context.user_data['score'] = context.user_data['score'] + 1
+        update_user_answer_table(connection, chat_id, question_id)
+        context.user_data['answer'] = ''
     else:
         text = 'Неправильно… Попробуешь ещё раз?'
 
@@ -74,8 +81,9 @@ def handle_solution_attempt(update, context):
     return STAGE['QUIZ'].value
 
 
-def get_score(update, context):
-    score = context.user_data['score']
+def send_score(update, context, connection):
+    chat_id = update.message.chat.id
+    score = get_score(connection, chat_id)
     keyboard = [
         [KeyboardButton('Новый вопрос'), KeyboardButton('Сдаться')],
         [KeyboardButton('Мой счет')]
@@ -87,29 +95,6 @@ def get_score(update, context):
     )
 
 
-def main(bot_token, db_name, quiz_folder) -> None:
-    """Start the bot."""
-    connection = create_or_connect_db(db_name)
-    handle_new_question_request = partial(send_question, questions=get_questions(quiz_folder), db_connection=connection)
-    updater = Updater(bot_token)
-    dispatcher = updater.dispatcher
-    conv_handler = ConversationHandler(
-        entry_points=[CommandHandler('start', start)],
-        states={
-            STAGE['QUIZ'].value: [
-                MessageHandler(Filters.regex('Новый вопрос.*'), handle_new_question_request),
-                MessageHandler(Filters.regex('[Сc]даться'), surrunder),
-                MessageHandler(Filters.regex('Мой счет'), get_score),
-                MessageHandler(Filters.text, handle_solution_attempt),
-            ],
-        },
-        fallbacks=[CommandHandler('cancel', cancel)]
-    )
-    dispatcher.add_handler(conv_handler)
-    updater.start_polling()
-    updater.idle()
-
-
 if __name__ == '__main__':
     env = Env()
     env.read_env()
@@ -119,4 +104,29 @@ if __name__ == '__main__':
     db_name = args.database
     quiz_folder = args.quizfolder
 
-    main(bot_token, db_name, quiz_folder)
+    connection = sqlite3.connect(db_name, check_same_thread=False)
+    if args.init:
+        questions = get_questions(quiz_folder)
+        create_question_table(connection)
+        fill_question_table(connection, questions)
+        create_users_answers_table(connection)
+
+    handle_new_question_request = partial(send_question, db_connection=connection)
+    handle_send_score = partial(send_score, connection=connection)
+    updater = Updater(bot_token)
+    dispatcher = updater.dispatcher
+    conv_handler = ConversationHandler(
+        entry_points=[CommandHandler('start', start)],
+        states={
+            STAGE['QUIZ'].value: [
+                MessageHandler(Filters.regex('Новый вопрос.*'), handle_new_question_request),
+                MessageHandler(Filters.regex('[Сc]даться'), surrunder),
+                MessageHandler(Filters.regex('Мой счет'), handle_send_score),
+                MessageHandler(Filters.text, handle_solution_attempt),
+            ],
+        },
+        fallbacks=[CommandHandler('cancel', cancel)]
+    )
+    dispatcher.add_handler(conv_handler)
+    updater.start_polling()
+    updater.idle()

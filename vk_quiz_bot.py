@@ -15,7 +15,7 @@ def send_question(event, vk_api, keyboard, db_connection):
     insert_into_user_answers(connection, user_id, question_id, 0)
     vk_api.messages.send(
         user_id=user_id,
-        message=f'{question} \n {answer}',
+        message=f'{question}',
         random_id=random.randint(1, 1000),
         keyboard=keyboard.get_keyboard(),
     )
@@ -92,7 +92,7 @@ if __name__ == "__main__":
                         random_id=random.randint(1, 1000),
                         keyboard=keyboard.get_keyboard(),
                     )
-                    update(connection, event.user_id, question_id)
+                    update_user_answer_table(connection, event.user_id, question_id)
 
                 else:
                     vk_api.messages.send(

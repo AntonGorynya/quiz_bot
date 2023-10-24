@@ -1,5 +1,3 @@
-
-
 def create_users_answers_table(connection):
     cursor = connection.cursor()
     cursor.execute('''
@@ -37,7 +35,7 @@ def fill_question_table(connection, questions):
     connection.commit()
 
 
-def update(connection, user_id, question_id):
+def update_user_answer_table(connection, user_id, question_id):
     cursor = connection.cursor()
     cursor.execute('UPDATE User_answers SET answered = 1 WHERE user_id = ? AND question_id = ?', (user_id, question_id))
     connection.commit()
