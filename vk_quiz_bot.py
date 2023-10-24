@@ -4,29 +4,21 @@ from vk_api.longpoll import VkLongPoll, VkEventType
 from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 from environs import Env
 from quiz_utils import get_questions, check_answer
-from db_functions import create_or_connect_db
+from db_functions import *
 from cli_interface import create_parser
 
 
-def send_question(event, vk_api, questions, db_connection):
-    cursor = db_connection.cursor()
-    question, answer = random.choice(list(questions.items()))
-    cursor.execute('INSERT INTO User_answers (user_id, question, answered) VALUES (?, ?, ?)', (event.user_id, question, 0))
-    db_connection.commit()
+def send_question(event, vk_api, keyboard, db_connection):
+    user_id = event.user_id
+    question_id, question, answer = get_question(db_connection)
+    insert_into_user_answers(connection, user_id, question_id, 0)
     vk_api.messages.send(
-        user_id=event.user_id,
-        message=f'{question}',
-        random_id=random.randint(1, 1000)
+        user_id=user_id,
+        message=f'{question} \n {answer}',
+        random_id=random.randint(1, 1000),
+        keyboard=keyboard.get_keyboard(),
     )
     return question, answer
-
-
-def send_message(event, vk_api, text):
-    vk_api.messages.send(
-        user_id=event.user_id,
-        message=text,
-        random_id=random.randint(1, 1000)
-    )
 
 
 def create_keyboard():
@@ -37,6 +29,7 @@ def create_keyboard():
     keyboard.add_button('Мой счет', color=VkKeyboardColor.SECONDARY)
     return keyboard
 
+
 if __name__ == "__main__":
     env = Env()
     env.read_env()
@@ -45,41 +38,65 @@ if __name__ == "__main__":
     bot_token = env('VK_TOKEN')
     db_name = args.database
     quiz_folder = args.quizfolder
-    questions = get_questions(quiz_folder)
-    connection = create_or_connect_db(db_name)
-    answer = ''
-    question = ''
-    score = 0
+    connection = sqlite3.connect(db_name, check_same_thread=False)
+    keyboard = create_keyboard()
+
+    if args.init:
+        questions = get_questions(quiz_folder)
+        create_question_table(connection)
+        fill_question_table(connection, questions)
+        create_users_answers_table(connection)
 
     vk_session = vk.VkApi(token=bot_token)
     vk_api = vk_session.get_api()
     longpoll = VkLongPoll(vk_session)
 
-    create_keyboard()
-
-
     for event in longpoll.listen():
         if event.type == VkEventType.MESSAGE_NEW and event.to_me:
             if event.text == "Новый вопрос":
-                question, answer = send_question(event, vk_api, questions, connection)
+                question, answer = send_question(event, vk_api, keyboard, connection)
             elif event.text == "Сдаться":
-                if not question:
-                    send_message(event, vk_api, f'Сначала попытайтесь ответить на вопрос')
-                if answer:
-                    send_message(event, vk_api, f'Верный ответ: {answer}')
-                    answer = ''
-                    question = ''
-            elif event.text == "Мой счет":
-                send_message(event, vk_api, f'Ваш счет: {score}')
-            else:
-                if check_answer(event.text, answer):
-                    send_message(
-                        event,
-                        vk_api,
-                        f'Правильно! Поздравляю! Для следующего вопроса нажми «Новый вопрос»'
+                _, question_id, answered = get_last_attempt(connection, event.user_id)
+                if answered:
+                    vk_api.messages.send(
+                        user_id=event.user_id,
+                        message=f'Сначала попытайтесь ответить на новый вопрос',
+                        random_id=random.randint(1, 1000),
+                        keyboard=keyboard.get_keyboard(),
                     )
-                    answer = ''
-                    question = ''
-                    score = score+1
                 else:
-                    send_message(event, vk_api, f'Неправильно… Попробуешь ещё раз?')
+                    question_id, question, answer = get_question(connection, question_id=question_id)
+                    vk_api.messages.send(
+                        user_id=event.user_id,
+                        message=f'Верный ответ: {answer}',
+                        random_id=random.randint(1, 1000),
+                        keyboard=keyboard.get_keyboard(),
+                    )
+            elif event.text == "Мой счет":
+                score = get_score(connection, event.user_id)
+                vk_api.messages.send(
+                    user_id=event.user_id,
+                    message=f'Ваш счет: {score}',
+                    random_id=random.randint(1, 1000),
+                    keyboard=keyboard.get_keyboard(),
+                )
+
+            else:
+                _, question_id, answered = get_last_attempt(connection, event.user_id)
+                _, question, answer = get_question(connection, question_id=question_id)
+                if check_answer(event.text, answer):
+                    vk_api.messages.send(
+                        user_id=event.user_id,
+                        message=f'Правильно! Поздравляю! Для следующего вопроса нажми «Новый вопрос»',
+                        random_id=random.randint(1, 1000),
+                        keyboard=keyboard.get_keyboard(),
+                    )
+                    update(connection, event.user_id, question_id)
+
+                else:
+                    vk_api.messages.send(
+                        user_id=event.user_id,
+                        message=f'Неправильно… Попробуешь ещё раз?',
+                        random_id=random.randint(1, 1000),
+                        keyboard=keyboard.get_keyboard(),
+                    )

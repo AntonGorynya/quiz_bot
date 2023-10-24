@@ -20,9 +20,9 @@ def get_questions(quiz_folder) -> dict:
 def check_answer(user_answer, correct_answer):
     user_answer = user_answer.strip()
     correct_answer = re.sub(r'[\(\[][^()]*[\)\]]', '', correct_answer)
-    correct_answer = correct_answer.strip()
     if '"' in correct_answer:
         correct_answer = correct_answer.replace('"', '')
-    if '... ' in correct_answer:
-        correct_answer = correct_answer.replace('... ', '')
+    if '.' in correct_answer:
+        correct_answer = correct_answer.replace('.', '')
+    correct_answer = correct_answer.strip()
     return user_answer == correct_answer
