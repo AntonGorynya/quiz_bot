@@ -38,7 +38,7 @@ def send_question(update, context, db_connection):
     chat_id = update.message.chat.id
     question_id, question, answer = get_question(db_connection)
     insert_into_user_answers(db_connection, chat_id, question_id, 0)
-    update.message.reply_text(f'{question} \n {answer}')
+    update.message.reply_text(f'{question}')
     context.user_data['answer'] = answer
     context.user_data['question_id'] = question_id
     context.user_data['connection'] = db_connection
