@@ -9,7 +9,7 @@ from db_functions import *
 from cli_interface import create_parser
 
 
-def send_question(event, vk_api, keyboard, db_connection):
+def process_question(event, vk_api, keyboard, db_connection):
     user_id = event.user_id
     question_id, question, answer = get_question(db_connection)
     insert_into_user_answers(connection, user_id, question_id, 0)
@@ -55,7 +55,7 @@ if __name__ == "__main__":
     for event in longpoll.listen():
         if event.type == VkEventType.MESSAGE_NEW and event.to_me:
             if event.text == "Новый вопрос":
-                question, answer = send_question(event, vk_api, keyboard, connection)
+                question, answer = process_question(event, vk_api, keyboard, connection)
             elif event.text == "Сдаться":
                 _, question_id, answered = get_last_attempt(connection, event.user_id)
                 if answered:
