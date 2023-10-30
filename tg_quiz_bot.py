@@ -41,7 +41,6 @@ def send_question(update, context, db_connection):
     update.message.reply_text(f'{question}')
     context.user_data['answer'] = answer
     context.user_data['question_id'] = question_id
-    context.user_data['connection'] = db_connection
     return STAGE['QUIZ'].value
 
 
@@ -59,7 +58,6 @@ def handle_solution_attempt(update, context):
     question_id = context.user_data['question_id']
     user_answer = update.message.text
     chat_id = update.message.chat.id
-    connection = context.user_data['connection']
 
     keyboard = [
         [KeyboardButton('Новый вопрос'), KeyboardButton('Сдаться')],
