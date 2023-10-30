@@ -34,7 +34,7 @@ def cancel(update, _):
     return ConversationHandler.END
 
 
-def send_question(update, context, db_connection):
+def process_question(update, context, db_connection):
     chat_id = update.message.chat.id
     question_id, question, answer = get_question(db_connection)
     insert_into_user_answers(db_connection, chat_id, question_id, 0)
@@ -109,7 +109,7 @@ if __name__ == '__main__':
         fill_question_table(connection, questions)
         create_users_answers_table(connection)
 
-    handle_new_question_request = partial(send_question, db_connection=connection)
+    handle_new_question_request = partial(process_question, db_connection=connection)
     handle_send_score = partial(send_score, connection=connection)
     updater = Updater(bot_token)
     dispatcher = updater.dispatcher
