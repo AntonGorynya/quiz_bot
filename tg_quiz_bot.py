@@ -5,7 +5,7 @@ import sqlite3
 
 from telegram import Update, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext, ConversationHandler
-from quiz_utils import get_questions, check_answer
+from quiz_utils import check_answer
 from db_functions import *
 from cli_interface import create_parser
 
@@ -99,15 +99,7 @@ if __name__ == '__main__':
     parser = create_parser()
     args = parser.parse_args()
     bot_token = env('TG_TOKEN')
-    db_name = args.database
-    quiz_folder = args.quizfolder
-
-    connection = sqlite3.connect(db_name, check_same_thread=False)
-    if args.init:
-        questions = get_questions(quiz_folder)
-        create_question_table(connection)
-        fill_question_table(connection, questions)
-        create_users_answers_table(connection)
+    connection = sqlite3.connect(args.database, check_same_thread=False)
 
     handle_new_question_request = partial(process_question, db_connection=connection)
     handle_send_score = partial(send_score, connection=connection)

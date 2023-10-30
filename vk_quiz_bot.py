@@ -4,7 +4,7 @@ import vk_api as vk
 from vk_api.longpoll import VkLongPoll, VkEventType
 from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 from environs import Env
-from quiz_utils import get_questions, check_answer
+from quiz_utils import check_answer
 from db_functions import *
 from cli_interface import create_parser
 
@@ -37,16 +37,8 @@ if __name__ == "__main__":
     parser = create_parser()
     args = parser.parse_args()
     bot_token = env('VK_TOKEN')
-    db_name = args.database
-    quiz_folder = args.quizfolder
-    connection = sqlite3.connect(db_name, check_same_thread=False)
+    connection = sqlite3.connect(args.database, check_same_thread=False)
     keyboard = create_keyboard()
-
-    if args.init:
-        questions = get_questions(quiz_folder)
-        create_question_table(connection)
-        fill_question_table(connection, questions)
-        create_users_answers_table(connection)
 
     vk_session = vk.VkApi(token=bot_token)
     vk_api = vk_session.get_api()
